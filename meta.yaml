@@ -1,0 +1,28 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: certification-service
+  version: {{ data.get('version') }}
+  
+source:
+  path: ./
+
+build:
+  number: {{ environ.get('BUILD_NUMBER', 0) }}
+  noarch: python
+
+requirements:
+  build:
+    - git
+
+  host:
+    - python
+
+  run:
+    - python=3.7
+    - celery=4.4.0rc1
+    - flask=1.1.0
+    - flask-restful=0.3.6
+    - pymongo=3.8.0
+    - redis-py=3.2.1
+    - esgf-compute-api=2.2.*

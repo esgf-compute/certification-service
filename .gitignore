@@ -1,0 +1,7 @@
+*.log
+*.bak
+*.dat
+*.dir
+*.egg-info
+*.rdb
+*.log
