@@ -6,7 +6,7 @@ eval "$(conda shell.bash hook)"
 
 if [[ -z "$(conda env list | grep cert-service)" ]] || [[ -n "${REBUILD}" ]]
 then
-  conda create -n cert-service -c conda-forge -y python=3.7 pyaml=19.4.1
+  conda create -n cert-service -c conda-forge -y python=3.7 pyaml=19.4.1 gunicorn=19.9.0
 
   conda activate cert-service
 
@@ -32,6 +32,12 @@ redis-server 2>&1 > redis.log &
 
 DEV=1 celery -A certification_service.tasks worker -c 2 -l DEBUG -B 2>&1 &
 
-trap "kill -2 $(jobs -pr)" SIGINT SIGTERM EXIT
+function cleanup {
+  killall mongod
+  killall redis-server
+  killall celery
+}
 
-DEV=1 python -m certification_service.service
+trap cleanup SIGINT SIGTERM EXIT
+
+DEV=1 gunicorn -b 0.0.0.0:8000 --reload "certification_service:create_app()"

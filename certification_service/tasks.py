@@ -12,8 +12,8 @@ from celery.schedules import crontab
 from celery.utils.log import get_task_logger
 from cwt_cert import main
 
-from certification_service.service import SUCCESS
-from certification_service.service import FAIL
+SUCCESS = 'success'
+FAIL = 'fail'
 
 os.environ['CELERY_BROKER_URL'] = 'redis://127.0.0.1:6379/0'
 os.environ['CELERY_RESULT_BACKEND'] = 'redis://127.0.0.1:6379/0'
@@ -24,39 +24,39 @@ app = Celery(__name__)
 
 app.conf.timezone = 'America/Los_Angeles'
 
-app.conf.beat_schedule = {
-    'pull_metrics': {
-        'task': 'certification_service.tasks.pull_metrics',
-        # 8 am each day
-        'schedule': crontab(minute='0', hour='8'),
-        'options': {
-            'ignore_result': True,
-        }
-    },
-    'run_certification': {
-        'task': 'certification_service.tasks.run_certification',
-        # 1 st of every month
-        'schedule': crontab(minute='0', hour='0', day_of_month='1'),
-        'options': {
-            'ignore_result': True,
-        },
-    },
-    'remove_old_metrics': {
-        'task': 'certification_service.tasks.remove_old_metrics',
-        # 1 am each day
-        'schedule': crontab(minute='0', hour='1'),
-        'options': {
-            'ignore_result': True,
-        },
-    },
-}
+# app.conf.beat_schedule = {
+#     'pull_metrics': {
+#         'task': 'certification_service.tasks.pull_metrics',
+#         # 8 am each day
+#         'schedule': crontab(minute='0', hour='8'),
+#         'options': {
+#             'ignore_result': True,
+#         }
+#     },
+#     'run_certification': {
+#         'task': 'certification_service.tasks.run_certification',
+#         # 1 st of every month
+#         'schedule': crontab(minute='0', hour='0', day_of_month='1'),
+#         'options': {
+#             'ignore_result': True,
+#         },
+#     },
+#     'remove_old_metrics': {
+#         'task': 'certification_service.tasks.remove_old_metrics',
+#         # 1 am each day
+#         'schedule': crontab(minute='0', hour='1'),
+#         'options': {
+#             'ignore_result': True,
+#         },
+#     },
+# }
 
-if DEV:
-    app.conf.beat_schedule['pull_metrics']['schedule'] = crontab(minute='*/1')
-
-    app.conf.beat_schedule['run_certification']['schedule'] = crontab(minute='*/5')
-
-    app.conf.beat_schedule['remove_old_metrics']['schedule'] = crontab(minute='*/4')
+# if DEV:
+#     app.conf.beat_schedule['pull_metrics']['schedule'] = crontab(minute='*/1')
+# 
+#     app.conf.beat_schedule['run_certification']['schedule'] = crontab(minute='*/5')
+# 
+#     app.conf.beat_schedule['remove_old_metrics']['schedule'] = crontab(minute='*/4')
 
 logger = get_task_logger(__name__)
 

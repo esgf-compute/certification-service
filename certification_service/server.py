@@ -1,26 +1,11 @@
 from datetime import datetime
 
 import bson
-import pymongo
-from flask import Flask
-from flask_restplus import Api, Resource, fields
+from flask_restplus import Namespace, Resource, fields
 
-# Setup mongo
-client = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
+from certification_service.model import db
 
-db = client['certification']
-
-db.servers.create_index('url', unique=True)
-
-# Setup Flask and Flask-restplus
-app = Flask(__name__)
-
-api = Api(app)
-
-
-SUCCESS = 'success'
-FAIL = 'fail'
-
+api = Namespace('servers', description='Registered servers')
 
 server = api.model('Server', {
     'url': fields.String(required=True),
@@ -35,27 +20,6 @@ listed_server = api.model('ListedServer', {
     'server': fields.Nested(server),
 })
 
-metric = api.model('Metric', {
-    'state': fields.String,
-    'data': fields.String,
-    'date_added': fields.DateTime,
-})
-
-listed_metric = api.model('ListedMetric', {
-    'id': fields.String(required=True),
-    'metric': fields.Nested(metric),
-})
-
-run = api.model('Run', {
-    'state': fields.String,
-    'data': fields.String,
-    'date_added': fields.DateTime,
-})
-
-listed_run = api.model('ListedRun', {
-    'id': fields.String(required=True),
-    'run': fields.Nested(run),
-})
 
 parser = api.parser()
 parser.add_argument('url', type=str)
@@ -63,16 +27,7 @@ parser.add_argument('module', type=str)
 parser.add_argument('token', type=str)
 
 
-@api.route('/server/<string:server_id>/run')
-class RunList(Resource):
-    @api.marshal_with(listed_run)
-    def get(self, server_id):
-        entries = [{'id': str(x['_id']), 'run': x} for x in db.runs.find({'server_id': bson.ObjectId(server_id)})]
-
-        return entries, 200
-
-
-@api.route('/servers')
+@api.route('/')
 class ServerList(Resource):
     @api.marshal_with(listed_server)
     def get(self):
@@ -135,20 +90,3 @@ class Server(Resource):
         entry = db.servers.find_one_and_update(filter, update)
 
         return entry
-
-
-@api.route('/server/<string:server_id>/metrics')
-class MetricList(Resource):
-    @api.marshal_with(listed_metric)
-    def get(self, server_id):
-        entries = [{'id': str(x['_id']), 'metric': x} for x in db.metrics.find({'server_id': bson.ObjectId(server_id)})]
-
-        return entries, 200
-
-
-def main():
-    app.run(host='0.0.0.0', use_reloader=True, extra_files=['certification_service/*'])
-
-
-if __name__ == '__main__':
-    main()
