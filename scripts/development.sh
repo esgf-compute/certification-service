@@ -10,7 +10,11 @@ then
 
   conda activate cert-service
 
+  conda install -y conda-build
+
   packages=$(conda render . --file render.yaml 2>&1 >/dev/null && cat render.yaml | python -c "import sys; import yaml; print(' '.join(yaml.load(sys.stdin, Loader=yaml.FullLoader)['requirements']['run']))")
+
+  rm render.yaml
 
   conda install -c conda-forge -c cdat -y ${packages} mongodb redis
 fi
@@ -26,8 +30,8 @@ mongod --dbpath ${PWD}/data 2>&1 > mongodb.log &
 
 redis-server 2>&1 > redis.log &
 
-celery -A certification_service.tasks worker -c 2 -l DEBUG -B 2>&1 &
+DEV=1 celery -A certification_service.tasks worker -c 2 -l DEBUG -B 2>&1 &
 
 trap "kill -2 $(jobs -pr)" SIGINT SIGTERM EXIT
 
-python -m certification_service.service
+DEV=1 python -m certification_service.service

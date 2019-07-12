@@ -7,3 +7,7 @@
 *.log
 
 data/
+
+*/__pycache__/*
+
+*.json
