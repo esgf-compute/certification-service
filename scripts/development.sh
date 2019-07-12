@@ -6,7 +6,7 @@ eval "$(conda shell.bash hook)"
 
 if [[ -z "$(conda env list | grep cert-service)" ]] || [[ -n "${REBUILD}" ]]
 then
-  conda create -n cert-service -c conda-forge -y python=3.7 pyaml=19.4.1 gunicorn=19.9.0
+  conda create -n cert-service -c conda-forge -y python=3.7 pyaml=19.4.1
 
   conda activate cert-service
 
@@ -40,4 +40,4 @@ function cleanup {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-DEV=1 gunicorn -b 0.0.0.0:8000 --reload "certification_service:create_app()"
+DEV=1 python -m certification_service.main
