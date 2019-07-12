@@ -17,7 +17,7 @@ listed_run = api.model('ListedRun', {
 })
 
 
-@api.route('/server/<string:server_id>/run')
+@api.route('/<string:server_id>')
 class RunList(Resource):
     @api.marshal_with(listed_run)
     def get(self, server_id):

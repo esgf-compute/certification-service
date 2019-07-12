@@ -17,7 +17,7 @@ listed_metric = api.model('ListedMetric', {
 })
 
 
-@api.route('/server/<string:server_id>/metrics')
+@api.route('/<string:server_id>')
 class MetricList(Resource):
     @api.marshal_with(listed_metric)
     def get(self, server_id):

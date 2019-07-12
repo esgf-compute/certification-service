@@ -56,7 +56,7 @@ class ServerList(Resource):
         return entry, 201
 
 
-@api.route('/server/<string:server_id>')
+@api.route('/<string:server_id>')
 class Server(Resource):
     def delete(self, server_id):
         db.servers.delete_one({'_id': bson.ObjectId(server_id)})
