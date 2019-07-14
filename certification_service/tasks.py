@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime
 from datetime import timedelta
 from uuid import uuid4
@@ -15,50 +16,64 @@ from cwt_cert import main
 SUCCESS = 'success'
 FAIL = 'fail'
 
-os.environ['CELERY_BROKER_URL'] = 'redis://127.0.0.1:6379/0'
-os.environ['CELERY_RESULT_BACKEND'] = 'redis://127.0.0.1:6379/0'
+BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
+RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/0')
+
+DATABASE = os.environ.get('DATABASE', 'mongodb://127.0.0.1:27017/')
 
 DEV = os.environ.get('DEV', False)
 
-app = Celery(__name__)
+app = Celery(__name__, broker=BROKER_URL, result=RESULT_BACKEND)
 
 app.conf.timezone = 'America/Los_Angeles'
 
-# app.conf.beat_schedule = {
-#     'pull_metrics': {
-#         'task': 'certification_service.tasks.pull_metrics',
-#         # 8 am each day
-#         'schedule': crontab(minute='0', hour='8'),
-#         'options': {
-#             'ignore_result': True,
-#         }
-#     },
-#     'run_certification': {
-#         'task': 'certification_service.tasks.run_certification',
-#         # 1 st of every month
-#         'schedule': crontab(minute='0', hour='0', day_of_month='1'),
-#         'options': {
-#             'ignore_result': True,
-#         },
-#     },
-#     'remove_old_metrics': {
-#         'task': 'certification_service.tasks.remove_old_metrics',
-#         # 1 am each day
-#         'schedule': crontab(minute='0', hour='1'),
-#         'options': {
-#             'ignore_result': True,
-#         },
-#     },
-# }
+app.conf.beat_schedule = {
+    'pull_metrics': {
+        'task': 'certification_service.tasks.pull_metrics',
+        # 8 am each day
+        'schedule': crontab(minute='0', hour='8'),
+        'options': {
+            'ignore_result': True,
+        }
+    },
+    'run_certification': {
+        'task': 'certification_service.tasks.run_certification',
+        # 1 st of every month
+        'schedule': crontab(minute='0', hour='0', day_of_month='1'),
+        'options': {
+            'ignore_result': True,
+        },
+    },
+    'remove_old_metrics': {
+        'task': 'certification_service.tasks.remove_old_metrics',
+        # 1 am each day
+        'schedule': crontab(minute='0', hour='1'),
+        'options': {
+            'ignore_result': True,
+        },
+    },
+}
 
-# if DEV:
-#     app.conf.beat_schedule['pull_metrics']['schedule'] = crontab(minute='*/1')
-# 
-#     app.conf.beat_schedule['run_certification']['schedule'] = crontab(minute='*/5')
-# 
-#     app.conf.beat_schedule['remove_old_metrics']['schedule'] = crontab(minute='*/4')
+if DEV:
+    app.conf.beat_schedule['pull_metrics']['schedule'] = crontab(minute='*/1')
+
+    app.conf.beat_schedule['run_certification']['schedule'] = crontab(minute='*/5')
+
+    app.conf.beat_schedule['remove_old_metrics']['schedule'] = crontab(minute='*/4')
 
 logger = get_task_logger(__name__)
+
+
+@contextmanager
+def get_db():
+    client = pymongo.MongoClient(DATABASE)
+
+    db = client['certification']
+
+    try:
+        yield db
+    finally:
+        client.close()
 
 
 def store_run_results(db, url, data, **result):
@@ -185,28 +200,23 @@ def pull_metrics(self):
 @app.task(bind=True)
 def pull_server_metrics(self, url, module, token):
     try:
-        client = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
+        with get_db() as db:
+            wps_client = cwt.WPSClient(url, api_key=token)
 
-        db = client['certification']
+            logger.info('Connecting to client %r', url)
 
-        wps_client = cwt.WPSClient(url, api_key=token)
+            process = wps_client.process_by_name('{!s}.metrics'.format(module))
 
-        logger.info('Connecting to client %r', url)
+            logger.info('Found operation %r', process.identifier)
 
-        process = wps_client.process_by_name('{!s}.metrics'.format(module))
+            wps_client.execute(process)
 
-        logger.info('Found operation %r', process.identifier)
+            logger.info('Executing operation, waiting 16 seconds for results')
 
-        wps_client.execute(process)
-
-        logger.info('Executing operation, waiting 16 seconds for results')
-
-        process.wait(16)
+            process.wait(16)
     except Exception as e:
         store_metrics_results(db, url, str(e), state=FAIL)
 
         pass
     else:
         store_metrics_results(db, url, json.dumps(process.output), state=SUCCESS)
-    finally:
-        client.close()

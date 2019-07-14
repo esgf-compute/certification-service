@@ -1,9 +1,9 @@
 import bson
 from flask_restplus import Namespace, Resource, fields
 
-from certification_service.model import db
+from certification_service.model import get_db
 
-api = Namespace('metric', description='Server metrics')
+api = Namespace('metrics', description='Server metrics')
 
 metric = api.model('Metric', {
     'state': fields.String,
@@ -21,6 +21,8 @@ listed_metric = api.model('ListedMetric', {
 class MetricList(Resource):
     @api.marshal_with(listed_metric)
     def get(self, server_id):
+        db = get_db()
+
         entries = [{'id': str(x['_id']), 'metric': x} for x in db.metrics.find({'server_id': bson.ObjectId(server_id)})]
 
         return entries, 200

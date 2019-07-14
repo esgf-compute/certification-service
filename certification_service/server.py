@@ -1,9 +1,10 @@
 from datetime import datetime
 
 import bson
+from pymongo.errors import DuplicateKeyError
 from flask_restplus import Namespace, Resource, fields
 
-from certification_service.model import db
+from certification_service.model import get_db
 
 api = Namespace('servers', description='Registered servers')
 
@@ -31,6 +32,8 @@ parser.add_argument('token', type=str)
 class ServerList(Resource):
     @api.marshal_with(listed_server)
     def get(self):
+        db = get_db()
+
         entries = [{'id': str(x['_id']), 'server': x} for x in db.servers.find()]
 
         return entries, 200
@@ -38,6 +41,8 @@ class ServerList(Resource):
     @api.expect(server)
     @api.marshal_with(server)
     def post(self):
+        db = get_db()
+
         args = parser.parse_args()
 
         now = datetime.now().isoformat()
@@ -51,7 +56,10 @@ class ServerList(Resource):
 
         }
 
-        db.servers.insert_one(entry)
+        try:
+            db.servers.insert_one(entry)
+        except DuplicateKeyError:
+            api.abort(400)
 
         return entry, 201
 
@@ -59,17 +67,19 @@ class ServerList(Resource):
 @api.route('/<string:server_id>')
 class Server(Resource):
     def delete(self, server_id):
+        db = get_db()
+
         db.servers.delete_one({'_id': bson.ObjectId(server_id)})
 
         db.metrics.delete_many({'server_id': bson.ObjectId(server_id)})
 
         db.runs.delete_many({'server_id': bson.ObjectId(server_id)})
 
-        return '', 204
-
     @api.expect(server)
     @api.marshal_with(server)
     def put(self, server_id):
+        db = get_db()
+
         args = parser.parse_args()
 
         filter = {'_id': bson.ObjectId(server_id)}
@@ -87,6 +97,6 @@ class Server(Resource):
 
         update = {'$set': update_values}
 
-        entry = db.servers.find_one_and_update(filter, update)
+        entry = db.servers.find_one_and_update(filter, update, return_document=True)
 
         return entry
