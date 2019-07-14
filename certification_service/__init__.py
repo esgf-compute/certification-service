@@ -1,10 +1,9 @@
-import os
-
-from flask import Flask
-from flask_restplus import Api
-
-
 def create_app(test_config=None):
+    import os
+
+    from flask import Flask
+    from flask_restplus import Api
+
     app = Flask(__name__)
 
     app.config['DATABASE'] = os.environ.get('DATABASE', 'mongodb://127.0.0.1:27017/')
