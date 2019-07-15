@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import bson
+from flask import g
 from pymongo.errors import DuplicateKeyError
 from flask_restplus import Namespace, Resource, fields
 
@@ -41,6 +42,9 @@ class ServerList(Resource):
     @api.expect(server)
     @api.marshal_with(server)
     def post(self):
+        if g.user is None:
+            api.abort(403)
+
         db = get_db()
 
         args = parser.parse_args()
@@ -67,6 +71,9 @@ class ServerList(Resource):
 @api.route('/<string:server_id>')
 class Server(Resource):
     def delete(self, server_id):
+        if g.user is None:
+            api.abort(403)
+
         db = get_db()
 
         db.servers.delete_one({'_id': bson.ObjectId(server_id)})
@@ -78,6 +85,9 @@ class Server(Resource):
     @api.expect(server)
     @api.marshal_with(server)
     def put(self, server_id):
+        if g.user is None:
+            api.abort(403)
+
         db = get_db()
 
         args = parser.parse_args()
