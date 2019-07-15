@@ -24,6 +24,8 @@ then
   conda activate cert-service
 fi
 
+pip install -e .
+
 mkdir -p ${PWD}/data
 
 mongod --dbpath ${PWD}/data 2>&1 > mongodb.log &
