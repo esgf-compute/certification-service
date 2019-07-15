@@ -102,26 +102,16 @@ def store_metrics_results(db, url, data, **result):
 
 @app.task(bind=True)
 def remove_old_metrics(self):
-    try:
-        client = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
-
-        db = client['certification']
-
+    with get_db() as db:
         cutoff = datetime.now() - timedelta(182)
 
         # Remove all metrics older than 6 months (182 days)
         db.metrics.delete_many({'date_added': {'$gte': cutoff}})
-    finally:
-        client.close()
 
 
 @app.task(bind=True)
 def run_certification(self):
-    try:
-        client = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
-
-        db = client['certification']
-
+    with get_db() as db:
         for server in db.servers.find():
             args = (server['url'], server['module'], server['token'])
 
@@ -135,51 +125,40 @@ def run_certification(self):
                 pass
 
         logger.info('Finished creating metrics tasks')
-    finally:
-        client.close()
 
 
 @app.task(bind=True)
 def run_server_certification(self, url, module, token):
-    try:
-        client = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
+    with get_db() as db:
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                uid = str(uuid4())[:8]
 
-        db = client['certification']
+                temp_file = os.path.join(temp_dir, '{!s}.json'.format(uid))
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            uid = str(uuid4())[:8]
+                args = [
+                    '--url', url,
+                    '--module', module,
+                    '--token', token,
+                    '-m', 'server and not stress',
+                    '--json-report-file', temp_file,
+                ]
 
-            temp_file = os.path.join(temp_dir, '{!s}.json'.format(uid))
+                main(*args, skip_exit=True)
 
-            args = [
-                '--url', url,
-                '--module', module,
-                '--token', token,
-                '-m', 'server and not stress',
-                '--json-report-file', temp_file,
-            ]
+                with open(temp_file) as infile:
+                    data = infile.read()
+        except Exception as e:
+            logger.error('Error running certification %r', e)
 
-            main(*args, skip_exit=True)
-
-            with open(temp_file) as infile:
-                data = infile.read()
-    except Exception as e:
-        store_run_results(db, url, str(e), state=FAIL)
-
-        pass
-    else:
-        store_run_results(db, url, data, state=SUCCESS)
-    finally:
-        client.close()
+            store_run_results(db, url, str(e), state=FAIL)
+        else:
+            store_run_results(db, url, data, state=SUCCESS)
 
 
 @app.task(bind=True)
 def pull_metrics(self):
-    try:
-        client = pymongo.MongoClient('mongodb://127.0.0.1:27017/')
-
-        db = client['certification']
-
+    with get_db() as db:
         for server in db.servers.find():
             args = (server['url'], server['module'], server['token'])
 
@@ -193,14 +172,12 @@ def pull_metrics(self):
                 pass
 
         logger.info('Finished creating metrics tasks')
-    finally:
-        client.close()
 
 
 @app.task(bind=True)
 def pull_server_metrics(self, url, module, token):
-    try:
-        with get_db() as db:
+    with get_db() as db:
+        try:
             wps_client = cwt.WPSClient(url, api_key=token)
 
             logger.info('Connecting to client %r', url)
@@ -214,9 +191,9 @@ def pull_server_metrics(self, url, module, token):
             logger.info('Executing operation, waiting 16 seconds for results')
 
             process.wait(16)
-    except Exception as e:
-        store_metrics_results(db, url, str(e), state=FAIL)
+        except Exception as e:
+            logger.error('Error calling metrics operation')
 
-        pass
-    else:
-        store_metrics_results(db, url, json.dumps(process.output), state=SUCCESS)
+            store_metrics_results(db, url, str(e), state=FAIL)
+        else:
+            store_metrics_results(db, url, json.dumps(process.output), state=SUCCESS)
