@@ -13,16 +13,16 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.update(test_config)
 
-    @app.route('/login', methods=('GET',))
-    def login():
-        return '''
-        <form method="post" action="/auth/login">
-            <input type="submit" value="Login">
-        </form>
-        <form method="get" action="/auth/logout">
-            <input type="submit" value="Logout">
-        </form>
-        '''
+    # @app.route('/login', methods=('GET',))
+    # def login():
+    #     return '''
+    #     <form method="post" action="/auth/login">
+    #         <input type="submit" value="Login">
+    #     </form>
+    #     <form method="get" action="/auth/logout">
+    #         <input type="submit" value="Logout">
+    #     </form>
+    #     '''
 
     api = Api(app)
 
