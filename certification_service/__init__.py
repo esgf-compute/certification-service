@@ -3,6 +3,7 @@ def create_app(test_config=None):
 
     from flask import Flask
     from flask_restplus import Api
+    from flask_cors import CORS
 
     app = Flask(__name__)
 
@@ -23,6 +24,8 @@ def create_app(test_config=None):
     #         <input type="submit" value="Logout">
     #     </form>
     #     '''
+
+    CORS(app)
 
     api = Api(app)
 

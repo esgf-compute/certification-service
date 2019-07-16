@@ -13,7 +13,7 @@ api = Namespace('auth', description='Authentication')
 
 
 def init_app(app):
-    oid = OpenID(app, safe_roots=['http://10.5.5.5:5000/'])
+    oid = OpenID(app, safe_roots=['http://10.5.5.5:3000/admin'])
 
     @app.cli.command('whitelist-user')
     @click.argument('openid')
@@ -48,13 +48,15 @@ def init_app(app):
             else:
                 return {'message': 'User has not been whitelisted'}, 200
 
-            return {'redirect': oid.get_next_url()}, 200
+            return redirect(oid.get_next_url()+'?openid_complete=true')
 
         def post(self):
             if g.user is not None:
                 return redirect(oid.get_next_url())
 
-            return oid.try_login('https://esgf-node.llnl.gov/esgf-idp/openid/')
+            x = oid.try_login('https://esgf-node.llnl.gov/esgf-idp/openid/')
+
+            return {'redirect': x.location}, 200
 
     @api.route('/logout')
     class Logout(Resource):
